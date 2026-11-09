@@ -1,0 +1,15 @@
+# Environment variables (API Keys)
+.env
+
+# Downloaded videos and outputs
+downloads/
+output/
+*.mp4
+*.mkv
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
