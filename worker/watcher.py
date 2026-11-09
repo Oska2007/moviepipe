@@ -12,24 +12,20 @@ class VideoHandler(FileSystemEventHandler):
             return
         
         file_path = event.src_path
-        # print(f"DEBUG: Event detected for: {file_path}")
         
         # වීඩියෝ ෆයිල් එකක්ද බලනවා (ටොරන්ට් එක්ක එන .srt ෆයිල්ස් මඟහරිනවා)
         if file_path.lower().endswith(('.mp4', '.mkv', '.avi', '.mov')):
             print(f"New video detected: {file_path}")
-            previous_size = -1
-            while True:
-                try:
-                    current_size = os.path.getsize(file_path)
-                    if current_size == previous_size:
-                        break # බාගැනීම ඉවරයි (සයිස් එක වැඩි වෙනවා නැත්නම්)
-                    previous_size = current_size
-                    time.sleep(5)
-                except FileNotFoundError:
-                    return 
-
+            
+            # Aria2 එකේ .aria2 ෆයිල් එක තියෙනකම් බලාගෙන ඉන්නවා (බාගැනීම ඉවර නැහැ)
+            aria2_file = file_path + ".aria2"
+            time.sleep(3) # ෆයිල් එක හැදෙන්න ටිකක් වෙලාව දෙන්න
+            
+            while os.path.exists(aria2_file):
+                print(f"Still downloading... waiting for {os.path.basename(file_path)}")
+                time.sleep(10) # තත්පර 10න් 10ට චෙක් කරනවා
+                
             print(f"Download complete, sending to queue: {file_path}")
-            # Celery එකට යවනවා
             process_video.delay(file_path)
 
 if __name__ == "__main__":

@@ -28,6 +28,6 @@ services:
       - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-    # Celery එකයි Watcher එකයි දෙකම එකපාර දුවන විදිය:
+    # Celery එකයි Watcher එකයි දෙකම එකපාර දුවන විදිය: (--concurrency=1 දැම්මා RAM එක ඉතිරි කරගන්න)
     command: sh -c "celery -A main worker --loglevel=info --concurrency=1 & python -u watcher.py"
     restart: always

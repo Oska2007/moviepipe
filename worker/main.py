@@ -3,6 +3,7 @@ import subprocess
 import boto3
 import asyncio
 import logging
+import time  # මේක අලුතින් එකතු කරන්න
 from faster_whisper import WhisperModel
 from deep_translator import GoogleTranslator
 from telegram import Bot
@@ -34,10 +35,11 @@ def process_video(file_path):
         logger.info(f"Starting processing for: {file_path}")
         
         # 1. උපසිරැසි සෑදීම (Faster-Whisper)
-        # VPS එකේ RAM එක අඩු නිසා "base" මොඩල් එක පාවිච්චි කරමු
         logger.info("Extracting audio and transcribing...")
+        # VPS එකේ RAM එක අඩු නිසා "base" මොඩල් එක පාවිච්චි කරමු
         model = WhisperModel("base", device="cpu", compute_type="int8")
-        segments, info = model.transcribe(file_path, beam_size=5)
+        # ඉංග්‍රීසි භාෂාවට විතරක් සෙට් කරන්න
+        segments, info = model.transcribe(file_path, beam_size=5, language="en")
         
         base_name = os.path.splitext(file_path)[0]
         english_srt = base_name + "_en.srt"
@@ -50,22 +52,27 @@ def process_video(file_path):
                 end_time = f"{int(segment.end//3600):02d}:{int((segment.end%3600)//60):02d}:{int(segment.end%60):02d},{int((segment.end%1)*1000):03d}"
                 f.write(f"{i}\n{start_time} --> {end_time}\n{segment.text.strip()}\n\n")
         
-        # 2. සිංහලට පරිවර්තනය කිරීම
+        # 2. සිංහලට පරිවර්තනය කිරීම (FIXED)
         logger.info("Translating to Sinhala...")
         translator = GoogleTranslator(source='en', target='si')
+        
         with open(english_srt, "r", encoding="utf-8") as f:
             lines = f.readlines()
             
         with open(sinhala_srt, "w", encoding="utf-8") as f:
             for line in lines:
                 if "-->" in line or line.strip().isdigit() or not line.strip():
-                    f.write(line) 
+                    f.write(line) # ටයිම් සහ අංක එහෙම්මම තියන්න
                 else:
                     try:
+                        # ලයින් එක translate කරන්න
                         translated = translator.translate(line.strip())
                         f.write(translated + "\n")
-                    except:
-                        f.write(line) 
+                        # Google Block කරන එක නවත්තන්න පොඩි ඩිලේ එකක් දෙන්න
+                        time.sleep(1) 
+                    except Exception as e:
+                        logger.error(f"Translation failed: {e}. Line: {line.strip()}")
+                        f.write(line) # එරර් එකක් ආවොත් ඉංග්‍රීසිම තියන්න
 
         # 3. x264 MP4 බවට පත් කිරීම (Soft Subs සමඟ)
         logger.info("Converting to x264 MP4 with soft subtitles...")
