@@ -6,7 +6,7 @@ services:
       - "8080:8080" # AriaNg Web UI
       - "6800:6800" # Aria2 RPC
     volumes:
-      - ./downloads:/downloads
+      - ./downloads:/aria2/data  # Aria2 බාගන්න දේවල් VPS එකේ downloads ෆෝල්ඩරයට එනවා
       - ./aria2-config:/config
     restart: always
 
@@ -14,12 +14,10 @@ services:
     image: redis:alpine
     restart: always
 
-  # මෙතනින් පහළට තියෙන කොටස හරියටම redis එකට සමානව (Space 2ක් දීලා) තියෙන්න ඕනේ
   worker:
     build: ./worker
     volumes:
-      - ./downloads:/downloads
-      - ./output:/output
+      - ./downloads:/downloads # Worker එකට ඒ ෆයිල්ස් පේනවා
     depends_on:
       - redis
       - aria2
@@ -30,5 +28,6 @@ services:
       - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-    command: sh -c "celery -A main worker --loglevel=info & python watcher.py"
+    # Celery එකයි Watcher එකයි දෙකම එකපාර දුවන විදිය:
+    command: sh -c "celery -A main worker --loglevel=info --concurrency=1 & python -u watcher.py"
     restart: always
