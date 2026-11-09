@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: moviepipe
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: moviepipe
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moviepipe"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  aria2:
+    image: p3terx/aria2-pro
+    environment:
+      RPC_SECRET: ${ARIA2_SECRET}
+      RPC_PORT: "6800"
+      LISTEN_PORT: "6888"
+      DISK_CACHE: 64M
+      UPDATE_TRACKERS: "true"
+    volumes:
+      - ./data/downloads:/downloads
+      - ./data/aria2:/config
+    ports:
+      - "6888:6888"
+      - "6888:6888/udp"
+    restart: unless-stopped
+
+  telegram-bot-api:
+    image: tdlib/telegram-bot-api:latest
+    command: ["--local"]
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+    volumes:
+      - tgbotdata:/var/lib/telegram-bot-api
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+      telegram-bot-api: { condition: service_started }
+    volumes:
+      - ./data:/data
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  worker:
+    build: ./worker
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+      aria2: { condition: service_started }
+      telegram-bot-api: { condition: service_started }
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  tgbotdata:

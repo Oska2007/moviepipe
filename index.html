@@ -1,0 +1,21 @@
+{% extends "base.html" %} {% block body %}
+<h2>Jobs</h2>
+<div class="new">
+  <input id="newUrl" placeholder="magnet: / http(s):// / .torrent link" />
+  <input id="newTitle" placeholder="title (optional)" />
+  <button onclick="createJob()">+ Add job</button>
+</div>
+<table id="jobs">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Title</th>
+      <th>Status</th>
+      <th>Progress</th>
+      <th>Msg</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+{% endblock %}
