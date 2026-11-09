@@ -1,5 +1,6 @@
 boto3
 python-telegram-bot
-openai-whisper
+faster-whisper
+deep-translator
 celery
 redis

@@ -23,6 +23,7 @@ services:
       - redis
       - aria2
     environment:
+      - R2_ENDPOINT_URL=https://<ඔබේ_CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
       - R2_ACCESS_KEY=your_r2_access_key
       - R2_SECRET_KEY=your_r2_secret_key
       - R2_BUCKET=your_bucket_name
