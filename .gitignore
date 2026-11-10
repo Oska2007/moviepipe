@@ -1,15 +1,11 @@
-# Environment variables (API Keys)
 .env
-
-# Downloaded videos and outputs
-downloads/
-output/
-*.mp4
-*.mkv
-
-# Python cache
+data/
+media/
+temp/
 __pycache__/
 *.pyc
-
-# OS files
-.DS_Store
+.pytest_cache/
+.venv/
+venv/
+*.db
+*.sqlite3

@@ -1,7 +1,0 @@
-boto3
-python-telegram-bot
-faster-whisper
-deep-translator
-celery
-redis
-watchdog

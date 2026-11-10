@@ -1,33 +1,39 @@
-version: '3.8'
 services:
-  aria2:
-    image: hurlenko/aria2-ariang
+  app:
+    build: .
+    container_name: mpe-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./media:/app/media
+      - ./temp:/app/temp
+    networks:
+      - mpe-net
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: mpe-caddy
+    restart: unless-stopped
     ports:
-      - "8080:8080" # AriaNg Web UI
-      - "6800:6800" # Aria2 RPC
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./downloads:/aria2/data  # Aria2 බාගන්න දේවල් VPS එකේ downloads ෆෝල්ඩරයට එනවා
-      - ./aria2-config:/config
-    restart: always
-
-  redis:
-    image: redis:alpine
-    restart: always
-
-  worker:
-    build: ./worker
-    volumes:
-      - ./downloads:/downloads # Worker එකට ඒ ෆයිල්ස් පේනවා
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - redis
-      - aria2
-    environment:
-      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
-      - R2_SECRET_KEY=${R2_SECRET_KEY}
-      - R2_BUCKET=${R2_BUCKET}
-      - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-    # Celery එකයි Watcher එකයි දෙකම එකපාර දුවන විදිය: (--concurrency=1 දැම්මා RAM එක ඉතිරි කරගන්න)
-    command: sh -c "celery -A main worker --loglevel=info --concurrency=1 & python -u watcher.py"
-    restart: always
+      - app
+    networks:
+      - mpe-net
+
+networks:
+  mpe-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

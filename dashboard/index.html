@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Media Processing Admin</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #0f172a;
+        color: #e5e7eb;
+      }
+      .card {
+        max-width: 1000px;
+        margin: 0 auto 20px;
+        background: #111827;
+        border: 1px solid #374151;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      input,
+      select,
+      button {
+        padding: 10px;
+        margin: 4px 0;
+        border-radius: 8px;
+        border: 1px solid #4b5563;
+        background: #1f2937;
+        color: #e5e7eb;
+      }
+      button {
+        cursor: pointer;
+        background: #2563eb;
+        border: none;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+      .btn-success {
+        background: #059669;
+      }
+      .btn-success:hover {
+        background: #047857;
+      }
+      .btn-danger {
+        background: #dc2626;
+      }
+      .btn-danger:hover {
+        background: #b91c1c;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #1e293b;
+        padding: 10px;
+        border-radius: 8px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .row > input,
+      .row > select {
+        flex: 1;
+        min-width: 200px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px;
+        border-bottom: 1px solid #374151;
+      }
+      th {
+        background-color: #1e293b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Standalone Media Processing Admin</h1>
+      <div id="loginBox">
+        <h2>Login</h2>
+        <input id="username" placeholder="Username" autocomplete="username" />
+        <input
+          id="password"
+          type="password"
+          placeholder="Password"
+          autocomplete="current-password"
+        />
+        <button id="loginBtn">Login</button>
+        <pre id="loginMsg"></pre>
+      </div>
+
+      <div id="appBox" style="display: none">
+        <p>
+          Logged in. <button id="logoutBtn" class="btn-danger">Logout</button>
+        </p>
+
+        <h2>Add New Media Job</h2>
+        <form id="jobForm">
+          <div class="row">
+            <select id="sourceType">
+              <option value="url">Direct HTTP URL</option>
+              <option value="magnet">Magnet Link</option>
+              <option value="torrent">.torrent Link / Path</option>
+            </select>
+            <input id="source" placeholder="URL / Magnet / Path" required />
+            <button type="button" id="inspectBtn" style="background: #d97706">
+              Inspect Torrent
+            </button>
+          </div>
+        </form>
+
+        <div id="torrentFilesBox" style="display: none; margin-top: 20px">
+          <h3>Select Files to Process</h3>
+          <table id="torrentFilesTable">
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>File Name</th>
+                <th>Size (MB)</th>
+                <th>New Name (Optional)</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <h2 style="margin-top: 40px">Jobs</h2>
+        <button id="refreshBtn">Refresh</button>
+        <pre id="jobsBox">No data</pre>
+      </div>
+    </div>
+
+    <script>
+      let token = localStorage.getItem("mpe_token") || "";
+
+      function showLoggedIn() {
+        document.getElementById("loginBox").style.display = token
+          ? "none"
+          : "block";
+        document.getElementById("appBox").style.display = token
+          ? "block"
+          : "none";
+        if (token) refreshJobs();
+      }
+
+      async function api(path, options = {}) {
+        options.headers = {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
+        const res = await fetch(path, options);
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`${res.status}: ${text}`);
+        }
+        return res.json();
+      }
+
+      document.getElementById("loginBtn").onclick = async () => {
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("username").value,
+              password: document.getElementById("password").value,
+            }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          token = data.access_token;
+          localStorage.setItem("mpe_token", token);
+          document.getElementById("loginMsg").textContent = "Login successful";
+          showLoggedIn();
+        } catch (err) {
+          document.getElementById("loginMsg").textContent = String(err);
+        }
+      };
+
+      document.getElementById("logoutBtn").onclick = () => {
+        token = "";
+        localStorage.removeItem("mpe_token");
+        showLoggedIn();
+      };
+
+      document.getElementById("inspectBtn").onclick = async () => {
+        const source = document.getElementById("source").value;
+        const sourceType = document.getElementById("sourceType").value;
+
+        if (!source)
+          return alert("Please enter a magnet or torrent link first.");
+        if (sourceType !== "magnet" && sourceType !== "torrent") {
+          return alert(
+            "Please select 'Magnet Link' or '.torrent' to inspect files.",
+          );
+        }
+
+        const btn = document.getElementById("inspectBtn");
+        btn.textContent = "Inspecting (Wait)...";
+        btn.disabled = true;
+
+        try {
+          const data = await api("/api/torrent/inspect", {
+            method: "POST",
+            body: JSON.stringify({ source_type: sourceType, source: source }),
+          });
+
+          const tbody = document.querySelector("#torrentFilesTable tbody");
+          tbody.innerHTML = "";
+
+          if (data.files.length === 0) {
+            alert("No files found in this torrent.");
+          } else {
+            data.files.forEach((f) => {
+              const tr = document.createElement("tr");
+              const sizeMB = (f.size / (1024 * 1024)).toFixed(2);
+              tr.innerHTML = `
+              <td><input type="checkbox" class="file-check" data-index="${f.index}"></td>
+              <td>${f.name}</td>
+              <td>${sizeMB} MB</td>
+              <td><input type="text" class="new-name" placeholder="New Name..."></td>
+              <td><button class="btn-success add-job-btn" data-index="${f.index}">Add Job</button></td>
+            `;
+              tbody.appendChild(tr);
+            });
+            document.getElementById("torrentFilesBox").style.display = "block";
+
+            document.querySelectorAll(".add-job-btn").forEach((btn) => {
+              btn.onclick = async (e) => {
+                const row = e.target.closest("tr");
+                const fileIndex = e.target.getAttribute("data-index");
+                const newName = row.querySelector(".new-name").value;
+
+                e.target.textContent = "Adding...";
+                e.target.disabled = true;
+
+                await createJob(sourceType, source, fileIndex, newName);
+
+                e.target.textContent = "Added!";
+                e.target.style.background = "#6b7280";
+              };
+            });
+          }
+        } catch (err) {
+          alert(String(err));
+        } finally {
+          btn.textContent = "Inspect Torrent";
+          btn.disabled = false;
+        }
+      };
+
+      async function createJob(
+        sourceType,
+        source,
+        torrentIndex = null,
+        customName = null,
+      ) {
+        const payload = {
+          source_type: sourceType,
+          source: source,
+          torrent_file_index: torrentIndex ? parseInt(torrentIndex) : null,
+          custom_output_name: customName || null,
+        };
+        await api("/api/jobs", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        refreshJobs();
+      }
+
+      document.getElementById("jobForm").onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const type = document.getElementById("sourceType").value;
+          const src = document.getElementById("source").value;
+
+          if (type === "magnet" || type === "torrent") {
+            alert(
+              "Please click 'Inspect Torrent' to select files from this torrent.",
+            );
+            return;
+          }
+
+          await createJob(type, src);
+          alert("Job created successfully!");
+          document.getElementById("source").value = "";
+        } catch (err) {
+          alert(String(err));
+        }
+      };
+
+      async function refreshJobs() {
+        try {
+          const jobs = await api("/api/jobs");
+          document.getElementById("jobsBox").textContent = JSON.stringify(
+            jobs,
+            null,
+            2,
+          );
+        } catch (err) {
+          document.getElementById("jobsBox").textContent = String(err);
+        }
+      }
+
+      document.getElementById("refreshBtn").onclick = refreshJobs;
+      showLoggedIn();
+    </script>
+  </body>
+</html>
